@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Cast system audio to a Chromecast (CLI). Portable: auto-detects the first
+# cast device if not specified.
+#   CAST_DEVICE="My TV"  cast-audio
+set -euo pipefail
+
+CATT="$(command -v catt || echo "$HOME/.local/bin/catt")"
+SERVER=""
+for d in "$HOME/.local/share/cast-to-tv" /usr/share/cast-to-tv /usr/local/share/cast-to-tv; do
+  [ -f "$d/audio_server.py" ] && SERVER="$d/audio_server.py" && break
+done
+[ -n "$SERVER" ] || { echo "audio_server.py not found (is cast-to-tv installed?)" >&2; exit 1; }
+
+SCAN="$("$CATT" scan 2>/dev/null || true)"
+if [ -n "${CAST_DEVICE:-}" ]; then
+  LINE="$(printf '%s\n' "$SCAN" | grep -F " - ${CAST_DEVICE} " | head -1 || true)"
+else
+  LINE="$(printf '%s\n' "$SCAN" | grep -E '^[0-9]+\.' | head -1 || true)"
+fi
+[ -n "$LINE" ] || { echo "No cast device found (set CAST_DEVICE, or check the network)." >&2; exit 1; }
+DEV_IP="$(printf '%s' "$LINE" | awk '{print $1}')"
+DEVICE="${CAST_DEVICE:-$(printf '%s' "$LINE" | sed -E 's/^[0-9.]+ - ([^-]*) -.*/\1/; s/ *$//')}"
+
+PORT="${CAST_PORT:-5580}"
+MON="${CAST_AUDIO:-$(pactl get-default-sink).monitor}"
+IP="$(ip -4 route get "$DEV_IP" 2>/dev/null | grep -oP 'src \K\S+' | head -1)"
+URL="http://${IP}:${PORT}/audio.mp3"
+
+SRVPID=""
+cleanup() {
+  "$CATT" -d "$DEVICE" stop >/dev/null 2>&1 || true
+  sleep 1
+  [ -n "$SRVPID" ] && kill "$SRVPID" 2>/dev/null || true
+  pkill -f "audio_server.py" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+echo "Audio  : $MON"
+echo "Target : $DEVICE ($DEV_IP)"
+echo "Stream : $URL"
+
+python3 "$SERVER" "$MON" "$PORT" &
+SRVPID=$!
+sleep 1
+"$CATT" -d "$DEVICE" cast --stream-type live "$URL" >/dev/null 2>&1
+echo; echo ">> Casting system audio to $DEVICE. Ctrl+C to stop."
+wait "$SRVPID"

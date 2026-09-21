@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Cast a monitor + system audio to a Chromecast (CLI). Portable: auto-detects
+# the first monitor and first cast device if not specified.
+#   CAST_DEVICE="My TV"  CAST_MONITOR=DP-2  CAST_FPS=30  cast-screen
+set -euo pipefail
+
+CATT="$(command -v catt || echo "$HOME/.local/bin/catt")"
+SERVER=""
+for d in "$HOME/.local/share/cast-to-tv" /usr/share/cast-to-tv /usr/local/share/cast-to-tv; do
+  [ -f "$d/screen_server.py" ] && SERVER="$d/screen_server.py" && break
+done
+[ -n "$SERVER" ] || { echo "screen_server.py not found (is cast-to-tv installed?)" >&2; exit 1; }
+
+# Discover a device (name + ip) unless CAST_DEVICE is set.
+SCAN="$("$CATT" scan 2>/dev/null || true)"
+if [ -n "${CAST_DEVICE:-}" ]; then
+  LINE="$(printf '%s\n' "$SCAN" | grep -F " - ${CAST_DEVICE} " | head -1 || true)"
+else
+  LINE="$(printf '%s\n' "$SCAN" | grep -E '^[0-9]+\.' | head -1 || true)"
+fi
+[ -n "$LINE" ] || { echo "No cast device found (set CAST_DEVICE, or check the network)." >&2; exit 1; }
+DEV_IP="$(printf '%s' "$LINE" | awk '{print $1}')"
+DEVICE="${CAST_DEVICE:-$(printf '%s' "$LINE" | sed -E 's/^[0-9.]+ - ([^-]*) -.*/\1/; s/ *$//')}"
+
+# Default to the largest-area monitor (avoids picking a tiny secondary display).
+MONITOR="${CAST_MONITOR:-$(gpu-screen-recorder --list-monitors 2>/dev/null | awk -F'|' '{split($2,a,"x"); ar=a[1]*a[2]; if(ar>mx){mx=ar; n=$1}} END{print n}')}"
+FPS="${CAST_FPS:-30}"
+AUDIO="${CAST_AUDIO:-default_output}"
+PORT="${CAST_PORT:-5581}"
+IP="$(ip -4 route get "$DEV_IP" 2>/dev/null | grep -oP 'src \K\S+' | head -1)"
+URL="http://${IP}:${PORT}/screen.mp4"
+
+SRVPID=""
+cleanup() {
+  "$CATT" -d "$DEVICE" stop >/dev/null 2>&1 || true
+  sleep 1
+  [ -n "$SRVPID" ] && kill "$SRVPID" 2>/dev/null || true
+  pkill -f "screen_server.py" 2>/dev/null || true
+  pkill -f "gpu-screen-recorder -w ${MONITOR}" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+echo "Monitor : $MONITOR    Audio: $AUDIO    FPS: $FPS"
+echo "Target  : $DEVICE ($DEV_IP)"
+echo "Stream  : $URL"
+
+python3 "$SERVER" "$MONITOR" "$PORT" "$AUDIO" "$FPS" &
+SRVPID=$!
+sleep 1
+"$CATT" -d "$DEVICE" cast --stream-type live "$URL" >/dev/null 2>&1
+echo; echo ">> Casting screen + audio to $DEVICE. Ctrl+C to stop."
+wait "$SRVPID"

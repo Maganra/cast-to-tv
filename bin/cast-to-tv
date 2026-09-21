@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Launch the Cast to TV GUI. Finds the app wherever it was installed.
+for d in "$HOME/.local/share/cast-to-tv" /usr/share/cast-to-tv /usr/local/share/cast-to-tv; do
+  if [ -f "$d/cast_to_tv.py" ]; then
+    exec python3 "$d/cast_to_tv.py" "$@"
+  fi
+done
+echo "cast-to-tv: cast_to_tv.py not found (is it installed?)" >&2
+exit 1

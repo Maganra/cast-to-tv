@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Cast to TV
+Comment=Cast a monitor or system audio to a Chromecast (pick monitor, audio, and target)
+Exec=cast-to-tv
+Icon=video-television
+Terminal=false
+Categories=AudioVideo;Video;
+Keywords=cast;chromecast;screen;mirror;audio;tv;
+StartupNotify=true
