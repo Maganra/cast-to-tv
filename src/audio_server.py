@@ -2,11 +2,14 @@
 # Threaded HTTP server: streams a PulseAudio/PipeWire monitor (system audio)
 # as live MP3, spawning a fresh ffmpeg per connection. A fresh encoder per
 # request is what survives the Chromecast's probe-then-play pattern.
-# Args: <pulse_monitor_source> <port>
-import http.server, socketserver, subprocess, sys, os, signal
+import argparse
+import http.server, socketserver, subprocess, os, signal
 
-MON = sys.argv[1]
-PORT = int(sys.argv[2])
+ap = argparse.ArgumentParser(description="System audio -> live MP3 HTTP stream")
+ap.add_argument("source", help="pulse monitor source")
+ap.add_argument("port", type=int)
+ap.add_argument("--ab", default="192", help="audio bitrate in kbps (default 192)")
+args = ap.parse_args()
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -20,8 +23,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'audio/mpeg')
         self.end_headers()
         p = subprocess.Popen(
-            ['ffmpeg', '-hide_banner', '-loglevel', 'fatal', '-f', 'pulse', '-i', MON,
-             '-c:a', 'libmp3lame', '-b:a', '192k', '-f', 'mp3', '-'],
+            ['ffmpeg', '-hide_banner', '-loglevel', 'fatal', '-f', 'pulse',
+             '-i', args.source,
+             '-c:a', 'libmp3lame', '-b:a', f'{args.ab}k', '-f', 'mp3', '-'],
             stdout=subprocess.PIPE, preexec_fn=os.setsid)
         try:
             while True:
@@ -42,5 +46,5 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 
 socketserver.ThreadingTCPServer.allow_reuse_address = True
-with socketserver.ThreadingTCPServer(('0.0.0.0', PORT), Handler) as srv:
+with socketserver.ThreadingTCPServer(('0.0.0.0', args.port), Handler) as srv:
     srv.serve_forever()

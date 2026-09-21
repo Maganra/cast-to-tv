@@ -44,6 +44,12 @@ makepkg -si                           # builds & installs this package
 - Launch **Cast to TV** from your app menu, or run `cast-to-tv`.
 - Pick a **target device**, **mode** (Screen+Audio / Audio only), **monitor**,
   and **audio output**, then **Start**. It remembers your last choices.
+- The **Advanced tab** exposes the encoder/stream knobs: bitrate & bitrate
+  mode (CBR/QP/VBR), quality preset, keyframe interval, frame-rate mode,
+  MP4 fragment duration, encoder tune, audio bitrate, and cast stream type
+  (live/buffered). Defaults are the lowest-stable-latency config (~2s);
+  "Reset to defaults" restores them. Note: steadier streams buffer less —
+  overly aggressive values can *increase* latency.
 
 ### CLI
 
