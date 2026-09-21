@@ -49,7 +49,7 @@ makepkg -si                           # builds & installs this package
 
 ```bash
 cast-screen                 # first monitor + audio to first cast device
-CAST_DEVICE="My TV" CAST_MONITOR=DP-2 CAST_FPS=30 cast-screen
+CAST_DEVICE="My TV" CAST_MONITOR=DP-2 CAST_FPS=30 CAST_BITRATE=6000 cast-screen
 cast-audio                  # system audio to first cast device
 ```
 

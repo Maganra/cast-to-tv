@@ -27,6 +27,7 @@ MONITOR="${CAST_MONITOR:-$(gpu-screen-recorder --list-monitors 2>/dev/null | awk
 FPS="${CAST_FPS:-30}"
 AUDIO="${CAST_AUDIO:-default_output}"
 PORT="${CAST_PORT:-5581}"
+BITRATE="${CAST_BITRATE:-6000}"
 IP="$(ip -4 route get "$DEV_IP" 2>/dev/null | grep -oP 'src \K\S+' | head -1)"
 URL="http://${IP}:${PORT}/screen.mp4"
 
@@ -44,7 +45,7 @@ echo "Monitor : $MONITOR    Audio: $AUDIO    FPS: $FPS"
 echo "Target  : $DEVICE ($DEV_IP)"
 echo "Stream  : $URL"
 
-python3 "$SERVER" "$MONITOR" "$PORT" "$AUDIO" "$FPS" &
+python3 "$SERVER" "$MONITOR" "$PORT" "$AUDIO" "$FPS" "$BITRATE" &
 SRVPID=$!
 sleep 1
 "$CATT" -d "$DEVICE" cast --stream-type live "$URL" >/dev/null 2>&1
