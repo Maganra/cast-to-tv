@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Instantly pause/resume a running cast. Designed to be bound to a hotkey.
+#
+# Pause: pauses playback ON the Chromecast -> the TV freezes immediately
+#        (on a frame ~2s behind your desktop, since that's what it's showing).
+# Resume: stops and re-casts the same stream -> rejoins the LIVE desktop
+#        (a mirror has no "position" to keep; resuming the frozen buffer
+#        would permanently add the pause duration to the latency).
+#        Takes a few seconds to rebuffer.
+#
+#   CAST_DEVICE="My TV" cast-pause     # else: first device found
+set -euo pipefail
+
+CATT="$(command -v catt || echo "$HOME/.local/bin/catt")"
+
+if [ -n "${CAST_DEVICE:-}" ]; then
+  DEV=(-d "$CAST_DEVICE")
+else
+  LINE="$("$CATT" scan 2>/dev/null | grep -E '^[0-9]+\.' | head -1 || true)"
+  [ -n "$LINE" ] || { echo "No cast device found." >&2; exit 1; }
+  DEV=(-d "$(printf '%s' "$LINE" | sed -E 's/^[0-9.]+ - ([^-]*) -.*/\1/; s/ *$//')")
+fi
+
+STATE="$("$CATT" "${DEV[@]}" status 2>/dev/null | grep -oP 'State: \K\S+' || true)"
+
+case "$STATE" in
+  PLAYING|BUFFERING)
+    "$CATT" "${DEV[@]}" pause
+    ;;
+  PAUSED)
+    URL="$("$CATT" "${DEV[@]}" info 2>/dev/null | grep -oP 'content_id: \K\S+' || true)"
+    if [ -n "$URL" ]; then
+      "$CATT" "${DEV[@]}" stop >/dev/null 2>&1 || true
+      sleep 1
+      "$CATT" "${DEV[@]}" cast --stream-type live "$URL"
+    else
+      "$CATT" "${DEV[@]}" play   # fallback: plain resume
+    fi
+    ;;
+  *)
+    echo "Nothing casting (state: ${STATE:-idle})." >&2
+    exit 1
+    ;;
+esac

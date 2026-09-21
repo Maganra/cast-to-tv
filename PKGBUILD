@@ -22,6 +22,7 @@ package() {
   install -Dm755 bin/cast-to-tv "$pkgdir/usr/bin/cast-to-tv"
   install -Dm755 bin/cast-screen "$pkgdir/usr/bin/cast-screen"
   install -Dm755 bin/cast-audio  "$pkgdir/usr/bin/cast-audio"
+  install -Dm755 bin/cast-pause  "$pkgdir/usr/bin/cast-pause"
   # Desktop entry
   install -Dm644 cast-to-tv.desktop "$pkgdir/usr/share/applications/cast-to-tv.desktop"
 }

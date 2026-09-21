@@ -34,6 +34,7 @@ install -Dm644 src/audio_server.py  "$SHARE/audio_server.py"
 install -Dm755 bin/cast-to-tv  "$BIN/cast-to-tv"
 install -Dm755 bin/cast-screen "$BIN/cast-screen"
 install -Dm755 bin/cast-audio  "$BIN/cast-audio"
+install -Dm755 bin/cast-pause  "$BIN/cast-pause"
 install -Dm644 cast-to-tv.desktop "$APPS/cast-to-tv.desktop"
 command -v update-desktop-database >/dev/null && update-desktop-database "$APPS" 2>/dev/null || true
 

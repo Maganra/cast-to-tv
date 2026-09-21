@@ -103,6 +103,8 @@ class CastApp(QtWidgets.QWidget):
         self.setMinimumWidth(470)
         self.settings = QtCore.QSettings("cast-to-tv", "cast-to-tv")
         self.server = None
+        self.current_url = None
+        self.paused = False
         self._build_ui()
         self._check_deps()
         self._load_lists()
@@ -118,11 +120,15 @@ class CastApp(QtWidgets.QWidget):
 
         self.start_btn = QtWidgets.QPushButton("Start")
         self.start_btn.clicked.connect(self.start)
+        self.pause_btn = QtWidgets.QPushButton("Pause")
+        self.pause_btn.clicked.connect(self.pause_toggle)
+        self.pause_btn.setEnabled(False)
         self.stop_btn = QtWidgets.QPushButton("Stop")
         self.stop_btn.clicked.connect(self.stop)
         self.stop_btn.setEnabled(False)
         brow = QtWidgets.QHBoxLayout()
         brow.addWidget(self.start_btn)
+        brow.addWidget(self.pause_btn)
         brow.addWidget(self.stop_btn)
 
         self.status = QtWidgets.QLabel("Idle.")
@@ -371,11 +377,40 @@ class CastApp(QtWidgets.QWidget):
         subprocess.run([CATT, "-d", name, "cast",
                         "--stream-type", self.adv_stream.currentText(), url],
                        capture_output=True, text=True)
+        self.current_url = url
+        self.paused = False
         self._save()
         self.start_btn.setEnabled(False)
+        self.pause_btn.setEnabled(True)
+        self.pause_btn.setText("Pause")
         self.stop_btn.setEnabled(True)
         self._set_inputs_enabled(False)
         self.status.setText(f"Casting {what} to {name}. (give it a few seconds)")
+
+    def pause_toggle(self):
+        d = self.target.currentData()
+        if not d:
+            return
+        name = d[0]
+        if not self.paused:
+            # Pause ON the receiver -> TV freezes instantly.
+            subprocess.run([CATT, "-d", name, "pause"], capture_output=True, text=True)
+            self.paused = True
+            self.pause_btn.setText("Resume")
+            self.status.setText("Paused on the TV. Resume rejoins the live desktop.")
+        else:
+            # A mirror has no position to keep: resuming the frozen buffer would
+            # permanently add the pause duration to the latency, so re-cast to
+            # rejoin the live edge instead.
+            subprocess.run([CATT, "-d", name, "stop"], capture_output=True, text=True)
+            QtCore.QThread.msleep(800)
+            subprocess.run([CATT, "-d", name, "cast",
+                            "--stream-type", self.adv_stream.currentText(),
+                            self.current_url],
+                           capture_output=True, text=True)
+            self.paused = False
+            self.pause_btn.setText("Pause")
+            self.status.setText("Resuming at the live desktop… (a few seconds)")
 
     def stop(self):
         d = self.target.currentData()
@@ -390,7 +425,10 @@ class CastApp(QtWidgets.QWidget):
             self.server = None
         for pat in ("screen_server.py", "audio_server.py", "gpu-screen-recorder -w"):
             subprocess.run(["pkill", "-f", pat], capture_output=True)
+        self.paused = False
         self.start_btn.setEnabled(True)
+        self.pause_btn.setEnabled(False)
+        self.pause_btn.setText("Pause")
         self.stop_btn.setEnabled(False)
         self._set_inputs_enabled(True)
         self.status.setText("Stopped.")
